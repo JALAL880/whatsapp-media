@@ -1,0 +1,70 @@
+async function groupSatus(jid, content) {
+  const inside = await generateWAMessageContent(content, {
+    upload: sock.waUploadToServer
+  });
+  const messageSecret = crypto.randomBytes(32);
+  const m = generateWAMessageFromContent(jid, {
+    messageContextInfo: {
+      messageSecret 
+    },
+    groupStatusMessageV2: {
+      message: {
+        ...inside,
+        messageContextInfo: {
+          messageSecret
+        }
+      }
+    }
+  }, {});
+  await sock.relayMessage(jid, m.message, {
+    messageId: m.key.id
+  });
+  return m;
+}
+
+case "toswgc": {
+  if (!m.isGroup) return reply(mess.group);
+  if (!isAdmins && !!isOwner) return reply(mess.admin);
+  if (!isBotAdmins) return reply(mess.botadmin);
+  const isQuoted = !!m.quoted;
+  const mimeType = isQuoted ? (m.quoted.mimetype || m.quoted.mtype) : null;
+  const teks = text ? text.trim() : "";
+  let media;
+
+  if (isQuoted) media = await m.quoted.download();
+
+  let targetGc = m.chat;
+  let caption = teks;
+
+  if (!isOwner && teks.includes("|")) {
+    const [idgc, ...rest] = teks.split("|");
+    targetGc = idgc.trim();
+    caption = rest.join("|").trim();
+  }
+
+  let options = {};
+  if (isQuoted) {
+    if (/image/.test(mimeType)) {
+      options = { image: media, caption: caption };
+    } else if (/video/.test(mimeType)) {
+      options = { video: media, caption: caption };
+    } else if (/audio/.test(mimeType)) {
+      options = { audio: media, mimetype: "audio/mpeg", ptt: false };
+    } else {
+      return reply("❌ Hanya bisa gambar, video, audio atau teks untuk status grup!");
+    }
+  } else if (caption) {
+    options = { text: caption };
+  } else {
+    return reply(`Balas gambar/video/audio atau kasih teks!\nContoh: ${prefix + command} hallo`);
+  }
+
+  if (!!isOwner && m.chat !== targetGc) {
+    return reply("⚠️ Hanya owner yang bisa kirim status ke grup lain!");
+  }
+
+  await groupSatus(targetGc, options);
+
+  await sock.sendMessage(m.chat, { react: { text: "✅", key: m.key } });
+}
+break
